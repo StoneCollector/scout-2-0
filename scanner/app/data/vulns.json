@@ -1,0 +1,20 @@
+[
+  {
+    "id": "CVE-2021-39211",
+    "description": "A vulnerability in GLPI 9.5.5 allows remote code execution.",
+    "cvss_score": 8.8,
+    "severity": "HIGH",
+    "published": "2021-09-01T00:00:00",
+    "remediation": "Upgrade GLPI to the latest 10.x release",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-39211"
+  },
+  {
+    "id": "CVE-2021-21389",
+    "description": "GLPI Barcode plugin XSS issue.",
+    "cvss_score": 6.1,
+    "severity": "MEDIUM",
+    "published": "2021-04-01T00:00:00",
+    "remediation": "Upgrade GLPI to the latest 10.x release",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-21389"
+  }
+]

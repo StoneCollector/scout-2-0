@@ -1,0 +1,79 @@
+# ==============================================================================
+# Git Ignore - Scout Project Root
+# ==============================================================================
+
+# Temporary & Archive Directories
+temp/
+**/temp/
+
+# Environments & Secret Credentials
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+.venv/
+**/.venv/
+env/
+**/env/
+venv/
+**/venv/
+
+# Python Compilation & Testing Artifacts
+__pycache__/
+**/__pycache__/
+*.py[cod]
+**/*.py[cod]
+*$py.class
+**/*$py.class
+.pytest_cache/
+**/.pytest_cache/
+.coverage
+htmlcov/
+.agent/
+**/.agent/
+
+# Node & Frontend Dependencies
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Database & Runtime Execution Data
+**/data/*.db
+**/data/*.sqlite3
+**/data/feeds/
+**/data/logs/
+**/*.log
+
+# Pipeline Queues (Keep .gitkeep, do not commit untrusted / processed binaries)
+**/inbox/*
+!**/inbox/.gitkeep
+**/processing/*
+!**/processing/.gitkeep
+**/clean/*
+!**/clean/.gitkeep
+**/review/*
+!**/review/.gitkeep
+**/quarantine/*
+!**/quarantine/.gitkeep
+**/samples/*
+!**/samples/.gitkeep
+
+# ClamAV Debug Symbols, Static Libraries & UserManual
+**/*.pdb
+**/*.lib
+**/*.exp
+**/clamav/UserManual/
+
+# OS & Editor Artifacts
+.vscode/
+**/.vscode/
+.idea/
+**/.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

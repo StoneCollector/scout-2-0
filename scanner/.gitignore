@@ -1,0 +1,67 @@
+# ==============================================================================
+# Git Ignore - Scout Scanner
+# ==============================================================================
+
+# Environments & Secret Credentials
+.env
+.env.*
+!.env.example
+.venv/
+env/
+venv/
+
+# Python Compilation & Testing Artifacts
+__pycache__/
+**/__pycache__/
+*.py[cod]
+**/*.py[cod]
+*$py.class
+**/*$py.class
+.pytest_cache/
+**/.pytest_cache/
+.coverage
+htmlcov/
+.agent/
+**/.agent/
+
+# Node & Frontend Dependencies
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Database & Runtime Execution Data
+app/data/*.db
+app/data/*.sqlite3
+app/data/feeds/
+app/data/logs/
+*.log
+
+# Pipeline Queues (Keep .gitkeep, do not commit untrusted / processed binaries)
+inbox/*
+!inbox/.gitkeep
+processing/*
+!processing/.gitkeep
+clean/*
+!clean/.gitkeep
+review/*
+!review/.gitkeep
+quarantine/*
+!quarantine/.gitkeep
+samples/*
+!samples/.gitkeep
+
+# ClamAV Debug Symbols, Static Libraries & UserManual
+clamav/*.pdb
+clamav/*.lib
+clamav/*.exp
+clamav/UserManual/
+
+# OS & Editor Artifacts
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

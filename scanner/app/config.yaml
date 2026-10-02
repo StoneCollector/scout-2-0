@@ -1,0 +1,47 @@
+paths:
+  inbox: "C:\\SEM VII\\WAS\\Project\\scanner\\inbox"
+  processing: "C:\\SEM VII\\WAS\\Project\\scanner\\processing"
+  clean: "C:\\SEM VII\\WAS\\Project\\scanner\\clean"
+  review: "C:\\SEM VII\\WAS\\Project\\scanner\\review"
+  quarantine: "C:\\SEM VII\\WAS\\Project\\scanner\\quarantine"
+  data: "C:\\SEM VII\\WAS\\Project\\scanner\\app\\data"
+  tools: "C:\\SEM VII\\WAS\\Project\\scanner\\tools"
+  rules: "C:\\SEM VII\\WAS\\Project\\scanner\\rules"
+  clamav: "C:\\SEM VII\\WAS\\Project\\scanner\\clamav"
+
+clamav:
+  host: "127.0.0.1"
+  port: 3310
+  auto_start: true
+
+trusted_signers:
+  - "Oracle America, Inc."
+  - "The Document Foundation"
+  - "Wireshark Foundation"
+  - "Simon Bennetts"
+  - "ZAP"
+
+vendor_hashes:
+  - pattern: "*VirtualBox*"
+    source_type: "virtualbox_sums"
+    url: "https://www.virtualbox.org/download/hashes/6.1.30/SHA256SUMS"
+    manual_sha256: null
+
+  - pattern: "*ZAP*"
+    source_type: "zap_xml"
+    url: "https://raw.githubusercontent.com/zaproxy/zap-admin/master/ZapVersions-2.11.xml"
+    manual_sha256: null
+
+  - pattern: "*Wireshark*"
+    source_type: "wireshark_sigs"
+    url: "https://www.wireshark.org/download/src/all-versions/SIGNATURES-3.6.0.txt"
+    fallback_urls:
+      - "https://www.wireshark.org/download/SIGNATURES-3.6.0.txt"
+    manual_sha256: null
+
+  - pattern: "*LibreOffice*"
+    source_type: "libreoffice_page"
+    url: "https://downloadarchive.documentfoundation.org/libreoffice/old/7.2.3.2/win/x86_64/LibreOffice_7.2.3.2_Win_x64.msi.mirrorlist"
+    fallback_urls:
+      - "https://download.documentfoundation.org/libreoffice/stable/7.2.3/win/x86_64/LibreOffice_7.2.3_Win_x64.msi.mirrorlist"
+    manual_sha256: null
