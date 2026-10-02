@@ -39,8 +39,27 @@ export const Layout: React.FC<LayoutProps> = ({ children, wsConnected }) => {
         fetchSystemClamav().catch(() => null),
         fetchWatchFolder().catch(() => null),
       ]);
-      if (st) setClamav(st);
-      if (wf) setWatchFolderState(wf);
+      if (st) {
+        setClamav((prev) => {
+          if (prev && prev.status === st.status && prev.running === st.running) {
+            return prev;
+          }
+          return st;
+        });
+      }
+      if (wf) {
+        setWatchFolderState((prev) => {
+          if (
+            prev &&
+            prev.watch_dir === wf.watch_dir &&
+            prev.default_dir === wf.default_dir &&
+            prev.is_default === wf.is_default
+          ) {
+            return prev;
+          }
+          return wf;
+        });
+      }
     } catch (err) {
       console.error("Status check failed:", err);
     }

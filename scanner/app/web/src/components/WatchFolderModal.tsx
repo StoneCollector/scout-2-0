@@ -33,11 +33,11 @@ export const WatchFolderModal: React.FC<WatchFolderModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen && watchFolder) {
-      setAddressInput(watchFolder.watch_dir);
+    if (isOpen) {
+      setAddressInput(watchFolder?.watch_dir || "");
       setErrorMessage(null);
     }
-  }, [isOpen, watchFolder]);
+  }, [isOpen]);
 
   const handleNativeBrowse = async () => {
     setNativeBrowsing(true);
@@ -46,6 +46,18 @@ export const WatchFolderModal: React.FC<WatchFolderModalProps> = ({
       const res = await browseNativeFolder(addressInput);
       if (res.path) {
         setAddressInput(res.path);
+        // Automatically save folder selected from Windows Explorer
+        setUpdating(true);
+        try {
+          const saved = await setWatchFolder(res.path.trim(), false);
+          onUpdated(saved);
+          setAddressInput(saved.watch_dir);
+          onClose();
+        } catch (saveErr: any) {
+          setErrorMessage(saveErr.message || "Failed to update watch directory.");
+        } finally {
+          setUpdating(false);
+        }
       }
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to open folder browser.");

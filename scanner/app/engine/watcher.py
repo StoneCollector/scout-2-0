@@ -40,11 +40,23 @@ class InboxEventHandler(FileSystemEventHandler):
 
 class InboxWatcher:
     def __init__(self, inbox_dir: Optional[Path] = None):
-        self.inbox_dir = inbox_dir or settings.inbox_dir
+        self.inbox_dir = inbox_dir or self._get_initial_watch_dir()
         self.queue: queue.Queue = queue.Queue()
         self.observer: Optional[Observer] = None
         self.worker_thread: Optional[threading.Thread] = None
         self.running = False
+
+    def _get_initial_watch_dir(self) -> Path:
+        custom_file = settings.data_dir / "watch_folder.txt"
+        if custom_file.is_file():
+            try:
+                saved = custom_file.read_text(encoding="utf-8").strip()
+                if saved and Path(saved).is_dir():
+                    logger.info(f"Loaded persistent watch folder: {saved}")
+                    return Path(saved).resolve()
+            except Exception:
+                pass
+        return settings.inbox_dir
 
     def _is_file_ready(self, path: Path) -> bool:
         if not path.is_file():
@@ -151,12 +163,30 @@ class InboxWatcher:
 
         self.inbox_dir = target
 
+        # Persist custom watch directory to data/watch_folder.txt
+        custom_file = settings.data_dir / "watch_folder.txt"
+        try:
+            if target.resolve() == settings.inbox_dir.resolve():
+                if custom_file.exists():
+                    custom_file.unlink()
+            else:
+                custom_file.parent.mkdir(parents=True, exist_ok=True)
+                custom_file.write_text(str(target), encoding="utf-8")
+        except Exception as e:
+            logger.warning(f"Could not persist watch_folder.txt: {e}")
+
         if self.running:
             # Enqueue any existing ready files in newly configured folder
-            for item in self.inbox_dir.iterdir():
-                if item.is_file() and item.suffix.lower() not in IGNORE_EXTENSIONS:
-                    if not item.name.startswith(".") and not item.name.startswith("~"):
-                        self.queue.put(item)
+            try:
+                for item in self.inbox_dir.iterdir():
+                    try:
+                        if item.is_file() and item.suffix.lower() not in IGNORE_EXTENSIONS:
+                            if not item.name.startswith(".") and not item.name.startswith("~"):
+                                self.queue.put(item)
+                    except (PermissionError, OSError):
+                        continue
+            except (PermissionError, OSError) as e:
+                logger.warning(f"Could not enumerate existing files in {self.inbox_dir}: {e}")
 
             event_handler = InboxEventHandler(self.queue)
             self.observer = Observer()
@@ -166,6 +196,12 @@ class InboxWatcher:
         return self.inbox_dir
 
     def reset_to_default(self) -> Path:
+        custom_file = settings.data_dir / "watch_folder.txt"
+        try:
+            if custom_file.exists():
+                custom_file.unlink()
+        except Exception:
+            pass
         return self.set_watch_dir(settings.inbox_dir)
 
 
