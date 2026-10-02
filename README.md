@@ -25,8 +25,15 @@
 
 ## ⚡ Quick Start
 
-### 1. Run Scout
-No Node.js or npm is required to run Scout—the frontend is precompiled into `scanner/app/web/dist/` and served directly by FastAPI.
+### Option A: Standalone Executable (No Python Required)
+You can directly run the prepackaged standalone Windows application:
+```powershell
+.\scanner\dist\ScannerApp\ScannerApp.exe
+```
+This launches Scout in a dedicated native desktop window with real-time streaming logs, status indicators, and **`Open`** (browser dashboard) and **`Exit`** (graceful shutdown) buttons without opening a raw black console window.
+
+### Option B: Run from Source
+No Node.js or npm is required to run Scout from source—the frontend is precompiled into `scanner/app/web/dist/` and served directly by FastAPI.
 
 ```powershell
 cd scanner
@@ -44,6 +51,7 @@ cd dummy_bank
 .\run.bat
 ```
 Starts "El Banco" on **http://127.0.0.1:5000**. You can test Scout's Web Auditor against this endpoint.
+
 
 ---
 

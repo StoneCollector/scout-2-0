@@ -14,3 +14,8 @@ Core types (engine/models.py):
   Checker base class: name:str; check(path:Path, ctx:dict)->Result
   Verdict: "pass"|"review"|"block"
 Rules: type hints, small functions, no extra docs, no unrequested features. Every checker catches its own exceptions and returns status "skip" with the error in details.
+
+# PACKAGING
+Target: PyInstaller --onedir, Windows. Final folder ScannerApp\ with: ScannerApp.exe, _internal\, config.yaml, tools\ (sigcheck.exe, clamav\), rules\signature-base\, data\, inbox\ processing\ clean\ review\ quarantine\.
+Two path roots: BUNDLE_DIR (read-only bundled files: web\dist, default config) = sys._MEIPASS when frozen, else project root. APP_DIR (writable: data, folders, tools, rules, .env, config.yaml) = directory of the exe when frozen, else project root.
+FastAPI serves the built dashboard from BUNDLE_DIR\web\dist on the same port 8000. Single process serves everything.

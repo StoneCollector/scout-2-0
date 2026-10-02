@@ -5,16 +5,12 @@ from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 import yaml
 
-# Locate root directory
-CURRENT_FILE = Path(__file__).resolve()
-ENGINE_DIR = CURRENT_FILE.parent
-APP_DIR = ENGINE_DIR.parent
-SCANNER_DIR = APP_DIR.parent
+from engine.paths import APP_DIR, BUNDLE_DIR, app_path, bundle_path
 
-# Load .env (check scanner root, app root, current dir)
+# Load .env (check APP_DIR, APP_DIR / app, current dir)
 env_candidates = [
-    SCANNER_DIR / ".env",
-    APP_DIR / ".env",
+    app_path(".env"),
+    APP_DIR / "app" / ".env",
     Path(".env"),
 ]
 for env_path in env_candidates:
@@ -72,9 +68,10 @@ class Settings:
         candidates = [
             self.tools_dir / "sigcheck64.exe",
             self.tools_dir / "sigcheck.exe",
-            SCANNER_DIR / "sigcheck.exe",
-            SCANNER_DIR / "tools" / "sigcheck.exe",
-            SCANNER_DIR / "tools" / "sigcheck64.exe",
+            app_path("tools", "sigcheck64.exe"),
+            app_path("tools", "sigcheck.exe"),
+            app_path("sigcheck64.exe"),
+            app_path("sigcheck.exe"),
         ]
         for c in candidates:
             if c.is_file():
@@ -85,7 +82,9 @@ class Settings:
     def clamd_exe(self) -> Path:
         candidates = [
             self.clamav_dir / "clamd.exe",
-            SCANNER_DIR / "clamav" / "clamd.exe",
+            self.tools_dir / "clamav" / "clamd.exe",
+            app_path("tools", "clamav", "clamd.exe"),
+            app_path("clamav", "clamd.exe"),
         ]
         for c in candidates:
             if c.is_file():
@@ -97,7 +96,8 @@ class Settings:
         candidates = [
             self.rules_dir / "signature-base" / "yara",
             self.rules_dir / "yara",
-            SCANNER_DIR / "rules" / "signature-base" / "yara",
+            app_path("rules", "signature-base", "yara"),
+            app_path("rules", "yara"),
         ]
         for c in candidates:
             if c.is_dir():
@@ -108,8 +108,9 @@ class Settings:
 def load_settings(config_file: Optional[Path] = None) -> Settings:
     if config_file is None:
         candidates = [
-            APP_DIR / "config.yaml",
-            SCANNER_DIR / "config.yaml",
+            app_path("config.yaml"),
+            APP_DIR / "app" / "config.yaml",
+            bundle_path("config.yaml"),
             Path("config.yaml"),
         ]
         for c in candidates:
@@ -128,22 +129,43 @@ def load_settings(config_file: Optional[Path] = None) -> Settings:
         if not val:
             return default
         p = Path(val)
-        if not p.is_absolute():
-            p = (config_file.parent if config_file else APP_DIR) / p
-        return p
+        if p.is_absolute():
+            return p
+        # Check relative to APP_DIR first, then config_file parent
+        cand = (APP_DIR / p).resolve()
+        if cand.exists():
+            return cand
+        cand_app = (APP_DIR / "app" / p).resolve()
+        if cand_app.exists():
+            return cand_app
+        if config_file:
+            cand_cfg = (config_file.parent / p).resolve()
+            if cand_cfg.exists():
+                return cand_cfg
+        return cand
 
-    inbox = resolve_path(paths.get("inbox"), SCANNER_DIR / "inbox")
-    processing = resolve_path(paths.get("processing"), SCANNER_DIR / "processing")
-    clean = resolve_path(paths.get("clean"), SCANNER_DIR / "clean")
-    review = resolve_path(paths.get("review"), SCANNER_DIR / "review")
-    quarantine = resolve_path(paths.get("quarantine"), SCANNER_DIR / "quarantine")
-    data = resolve_path(paths.get("data"), APP_DIR / "data")
-    tools = resolve_path(paths.get("tools"), SCANNER_DIR / "tools")
-    rules = resolve_path(paths.get("rules"), SCANNER_DIR / "rules")
-    clamav_p = resolve_path(paths.get("clamav"), SCANNER_DIR / "clamav")
+    inbox = resolve_path(paths.get("inbox"), app_path("inbox"))
+    processing = resolve_path(paths.get("processing"), app_path("processing"))
+    clean = resolve_path(paths.get("clean"), app_path("clean"))
+    review = resolve_path(paths.get("review"), app_path("review"))
+    quarantine = resolve_path(paths.get("quarantine"), app_path("quarantine"))
+
+    default_data = app_path("data")
+    if not default_data.exists() and (APP_DIR / "app" / "data").exists():
+        default_data = APP_DIR / "app" / "data"
+    data = resolve_path(paths.get("data"), default_data)
+
+    tools = resolve_path(paths.get("tools"), app_path("tools"))
+    rules = resolve_path(paths.get("rules"), app_path("rules"))
+
+    default_clamav = app_path("tools", "clamav")
+    if not default_clamav.exists() and app_path("clamav").exists():
+        default_clamav = app_path("clamav")
+    clamav_p = resolve_path(paths.get("clamav"), default_clamav)
 
     for d in [inbox, processing, clean, review, quarantine, data, data / "feeds", data / "logs"]:
         d.mkdir(parents=True, exist_ok=True)
+
 
     trusted = raw_config.get(
         "trusted_signers",

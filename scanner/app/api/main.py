@@ -756,9 +756,11 @@ async def websocket_endpoint(websocket: WebSocket):
 # Mount built frontend if dist exists
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from engine.paths import get_web_dist_dir
 
-dist_dir = Path(__file__).resolve().parent.parent / "web" / "dist"
+dist_dir = get_web_dist_dir()
 if dist_dir.is_dir():
+    logger.info(f"Serving frontend from {dist_dir}")
     assets_dir = dist_dir / "assets"
     if assets_dir.is_dir():
         app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
@@ -774,3 +776,6 @@ if dist_dir.is_dir():
         if index_file.is_file():
             return FileResponse(index_file)
         raise HTTPException(status_code=404, detail="Dashboard index.html not found")
+else:
+    logger.warning(f"Frontend dist directory not found at {dist_dir}. Static dashboard disabled.")
+

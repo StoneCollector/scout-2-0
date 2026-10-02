@@ -209,6 +209,45 @@ app/tests/test_web_scanner.py ...... PASSED
 
 ---
 
+## 📦 Standalone Executable & Packaging
+
+Scout is packaged as a self-contained Windows application (`dist\ScannerApp\`) with a dedicated native launcher window:
+
+```
+dist\ScannerApp\
+├── ScannerApp.exe         # Standalone desktop application launcher
+├── _internal\             # Bundled Python runtime, dependencies & prebuilt React dashboard
+├── tools\
+│   ├── sigcheck.exe       # Sysinternals signature tool
+│   └── clamav\            # ClamAV daemon (clamd.exe), freshclam & definitions
+├── rules\signature-base\  # 750+ YARA threat detection rules
+├── config.yaml            # Relative configuration
+├── .env                   # API keys configuration (ABUSECH_KEY, NVD_KEY)
+└── data\                  # SQLite database (scanner.db) and logs
+```
+
+### Native App Window
+When launched (`ScannerApp.exe`), Scout does **not** pop up an unsightly black terminal command prompt. Instead, it displays a sleek dark-themed desktop app window that:
+- **Streams Live Terminal Output:** Displays real-time startup diagnostics, ClamAV status, and scan logs directly in an embedded terminal view.
+- **`Open` Button:** Instantly opens the Scout dashboard (`http://localhost:8000`) in the default browser.
+- **`Exit` Button:** Gracefully terminates background file watchers, shuts down the ClamAV daemon, stops the FastAPI server, and closes the application.
+- **Single Instance Protection:** Only one instance runs at a time; launching a second instance automatically focuses and opens the existing dashboard in the browser.
+
+### Rebuilding the Executable
+To rebuild `dist\ScannerApp\` from source:
+```powershell
+powershell -ExecutionPolicy Bypass -File build.ps1
+```
+
+### Inno Setup Installer (`ScoutSetup.exe`)
+An Inno Setup script is provided at `installer.iss`:
+1. Install [Inno Setup 6](https://jrsoftware.org/isdl.php).
+2. Right-click `installer.iss` and click **Compile** (or run `"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss`).
+3. The standalone Windows installer `Output\ScoutSetup.exe` will be generated.
+
+---
+
 ## 📄 License
+
 
 Distributed under the MIT License.

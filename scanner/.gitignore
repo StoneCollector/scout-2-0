@@ -53,11 +53,16 @@ quarantine/*
 samples/*
 !samples/.gitkeep
 
-# ClamAV Debug Symbols, Static Libraries & UserManual
+# ClamAV Debug Symbols, Static Libraries, UserManual & Databases
 clamav/*.pdb
 clamav/*.lib
 clamav/*.exp
 clamav/UserManual/
+clamav/database/*.cvd
+clamav/database/*.cld
+clamav/database/*.sign
+clamav/database/freshclam.dat
+
 
 # OS & Editor Artifacts
 .vscode/
@@ -65,3 +70,10 @@ clamav/UserManual/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Packaging & Build Artifacts
+build/
+dist/
+Output/
+data/
+

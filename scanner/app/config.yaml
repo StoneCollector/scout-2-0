@@ -1,13 +1,13 @@
 paths:
-  inbox: "C:\\SEM VII\\WAS\\Project\\scanner\\inbox"
-  processing: "C:\\SEM VII\\WAS\\Project\\scanner\\processing"
-  clean: "C:\\SEM VII\\WAS\\Project\\scanner\\clean"
-  review: "C:\\SEM VII\\WAS\\Project\\scanner\\review"
-  quarantine: "C:\\SEM VII\\WAS\\Project\\scanner\\quarantine"
-  data: "C:\\SEM VII\\WAS\\Project\\scanner\\app\\data"
-  tools: "C:\\SEM VII\\WAS\\Project\\scanner\\tools"
-  rules: "C:\\SEM VII\\WAS\\Project\\scanner\\rules"
-  clamav: "C:\\SEM VII\\WAS\\Project\\scanner\\clamav"
+  inbox: "inbox"
+  processing: "processing"
+  clean: "clean"
+  review: "review"
+  quarantine: "quarantine"
+  data: "data"
+  tools: "tools"
+  rules: "rules"
+  clamav: "clamav"
 
 clamav:
   host: "127.0.0.1"
