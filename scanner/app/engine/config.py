@@ -7,6 +7,9 @@ import yaml
 
 from engine.paths import APP_DIR, BUNDLE_DIR, app_path, bundle_path
 
+# Backwards compatibility alias
+SCANNER_DIR = APP_DIR
+
 # Load .env (check APP_DIR, APP_DIR / app, current dir)
 env_candidates = [
     app_path(".env"),

@@ -25,6 +25,8 @@ hiddenimports = [
     'dotenv',
     'tkinter',
     'tkinter.font',
+    'tkinter.filedialog',
+    'engine.folder_browser',
 ]
 
 # Collect yara dependencies
