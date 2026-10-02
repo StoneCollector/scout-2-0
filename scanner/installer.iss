@@ -50,6 +50,8 @@ Name: "{app}\processing"; Permissions: users-full
 Name: "{app}\clean"; Permissions: users-full
 Name: "{app}\review"; Permissions: users-full
 Name: "{app}\quarantine"; Permissions: users-full
+Name: "{app}\tools\clamav\database"; Permissions: users-full
+Name: "{app}\tools\clamav\certs"; Permissions: users-full
 
 
 [Icons]

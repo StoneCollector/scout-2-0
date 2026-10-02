@@ -106,12 +106,28 @@ def ensure_clamav_configured() -> Optional[Path]:
         print("=" * 60 + "\n")
         logger.info("ClamAV signature database missing. Running freshclam to download definitions...")
         try:
+            certs_dir = clamav_dir / "certs"
+            certs_dir.mkdir(parents=True, exist_ok=True)
+            freshclam_cmd = [
+                str(freshclam_exe),
+                f"--config-file={fresh_conf_file.resolve()}",
+                f"--datadir={db_dir.resolve()}",
+                "--stdout",
+            ]
+            freshclam_env = os.environ.copy()
+            if (certs_dir / "clamav.crt").is_file():
+                freshclam_cmd.append(f"--cvdcertsdir={certs_dir.resolve()}")
+                freshclam_env["CVD_CERTS_DIR"] = str(certs_dir.resolve())
+            elif certs_dir.is_dir():
+                freshclam_cmd.append(f"--cvdcertsdir={certs_dir.resolve()}")
+
             creationflags = 0
             if os.name == "nt":
                 creationflags = subprocess.CREATE_NO_WINDOW
             p = subprocess.Popen(
-                [str(freshclam_exe), f"--config-file={fresh_conf_file}"],
+                freshclam_cmd,
                 cwd=str(clamav_dir),
+                env=freshclam_env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,

@@ -81,6 +81,16 @@ if (Test-Path $SrcClamAv) {
     } else {
         New-Item -ItemType Directory -Force -Path $DestDb | Out-Null
     }
+    # Ensure certs directory is preserved with clamav.crt for code-signature verification
+    $DestCerts = Join-Path $DestClamAv "certs"
+    New-Item -ItemType Directory -Force -Path $DestCerts | Out-Null
+    $SrcCert = Join-Path $SrcClamAv "certs\clamav.crt"
+    if (Test-Path $SrcCert) {
+        Copy-Item $SrcCert -Destination $DestCerts -Force
+        Write-Host "  - Preserved ClamAV signature cert (certs\clamav.crt)" -ForegroundColor Gray
+    } else {
+        Write-Host "  - Warning: ClamAV cert not found at $SrcCert" -ForegroundColor Yellow
+    }
     Write-Host "  - Copied ClamAV runtime binaries (definitions excluded for lightweight packaging)" -ForegroundColor Gray
 } else {
     Write-Host "  - Warning: ClamAV directory not found at $SrcClamAv" -ForegroundColor Yellow
