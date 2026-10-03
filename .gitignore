@@ -5,6 +5,10 @@
 # Temporary & Archive Directories
 temp/
 **/temp/
+/*.exe
+/*.msi
+/*.zip
+/*.tar.gz
 
 # Environments & Secret Credentials
 .env
