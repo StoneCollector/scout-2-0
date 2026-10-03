@@ -67,3 +67,35 @@ def test_api_system_clamav():
     assert "status" in data
     assert "host" in data
     assert "port" in data
+
+
+def test_api_trusted_signers():
+    # 1. GET trusted signers
+    resp = client.get("/api/settings/trusted-signers")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "signers" in data
+    assert "presets" in data
+    assert isinstance(data["signers"], list)
+    assert isinstance(data["presets"], list)
+
+    test_signer = "Test Automation Signer Corp"
+
+    # 2. Add signer
+    resp_add = client.post("/api/settings/trusted-signers", json={"signer": test_signer})
+    assert resp_add.status_code == 200
+    data_add = resp_add.json()
+    assert data_add["status"] == "success"
+    assert test_signer in data_add["signers"]
+
+    # 3. Add existing signer (idempotent / status: exists)
+    resp_dup = client.post("/api/settings/trusted-signers", json={"signer": test_signer})
+    assert resp_dup.status_code == 200
+    assert resp_dup.json()["status"] == "exists"
+
+    # 4. Delete signer via path
+    resp_del = client.delete(f"/api/settings/trusted-signers/{test_signer}")
+    assert resp_del.status_code == 200
+    data_del = resp_del.json()
+    assert data_del["status"] == "success"
+    assert test_signer not in data_del["signers"]

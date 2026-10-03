@@ -109,18 +109,54 @@ class Settings:
         return self.rules_dir / "signature-base" / "yara"
 
 
+import logging
+
+logger = logging.getLogger("scanner.config")
+
+def get_config_path(config_file: Optional[Path] = None) -> Optional[Path]:
+    if config_file is not None and config_file.is_file():
+        return config_file
+    candidates = [
+        app_path("config.yaml"),
+        APP_DIR / "app" / "config.yaml",
+        bundle_path("config.yaml"),
+        Path("config.yaml"),
+    ]
+    for c in candidates:
+        if c.is_file():
+            return c
+    if (APP_DIR / "app" / "config.yaml").parent.is_dir():
+        return APP_DIR / "app" / "config.yaml"
+    return app_path("config.yaml")
+
+
+def save_trusted_signers(signers: List[str]) -> bool:
+    cfg_file = get_config_path()
+    if not cfg_file:
+        return False
+    raw_config: Dict[str, Any] = {}
+    if cfg_file.is_file():
+        try:
+            with open(cfg_file, "r", encoding="utf-8") as f:
+                raw_config = yaml.safe_load(f) or {}
+        except Exception as e:
+            logger.warning(f"Failed to read {cfg_file} when saving signers: {e}")
+            raw_config = {}
+
+    raw_config["trusted_signers"] = signers
+    try:
+        cfg_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(cfg_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(raw_config, f, sort_keys=False, default_flow_style=False)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to write trusted signers to {cfg_file}: {e}")
+        return False
+
+
 def load_settings(config_file: Optional[Path] = None) -> Settings:
     if config_file is None:
-        candidates = [
-            app_path("config.yaml"),
-            APP_DIR / "app" / "config.yaml",
-            bundle_path("config.yaml"),
-            Path("config.yaml"),
-        ]
-        for c in candidates:
-            if c.is_file():
-                config_file = c
-                break
+        config_file = get_config_path()
 
     raw_config: Dict[str, Any] = {}
     if config_file and config_file.is_file():

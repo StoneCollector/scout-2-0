@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from engine.clamav_manager import get_clamav_status, start_clamav_daemon, stop_clamav_daemon
-from engine.config import settings
+from engine.config import settings, save_trusted_signers
 from engine.db import (
     SessionLocal,
     Scan,
@@ -391,6 +391,108 @@ async def browse_native_dialog(cfg: WatchFolderConfig):
     from engine.folder_browser import pick_folder_native_dialog
     chosen = await asyncio.to_thread(pick_folder_native_dialog, cfg.folder_path)
     return {"path": chosen}
+
+
+# ---------------------------------------------------------------------------
+# Trusted Signers Settings
+# ---------------------------------------------------------------------------
+
+PRESET_TRUSTED_SIGNERS = [
+    "Microsoft Corporation",
+    "Google LLC",
+    "Apple Inc.",
+    "Mozilla Corporation",
+    "GitHub, Inc.",
+    "Valve Corp.",
+    "JetBrains s.r.o.",
+    "Oracle America, Inc.",
+    "Wireshark Foundation",
+    "The Document Foundation",
+    "Simon Bennetts",
+    "Adobe Inc.",
+    "Brave Software, Inc.",
+    "Canonical Ltd.",
+    "Cisco Systems, Inc.",
+    "Docker Inc",
+    "VideoLAN",
+    "Notepad++",
+    "Igor Pavlov",
+]
+
+
+class TrustedSignerRequest(BaseModel):
+    signer: str
+
+
+def _remove_signer_internal(signer_name: str):
+    name = signer_name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Signer name cannot be empty")
+
+    original_len = len(settings.trusted_signers)
+    settings.trusted_signers = [s for s in settings.trusted_signers if s.lower() != name.lower()]
+
+    if len(settings.trusted_signers) == original_len:
+        raise HTTPException(status_code=404, detail=f"Signer '{name}' not found in trusted signers")
+
+    save_trusted_signers(settings.trusted_signers)
+    broadcast_pipeline_event({
+        "type": "trusted_signers_updated",
+        "signers": settings.trusted_signers,
+    })
+    return {
+        "status": "success",
+        "message": f"Removed '{name}' from trusted signers.",
+        "signers": settings.trusted_signers,
+        "presets": PRESET_TRUSTED_SIGNERS,
+    }
+
+
+@app.get("/api/settings/trusted-signers")
+def get_trusted_signers():
+    return {
+        "signers": settings.trusted_signers,
+        "presets": PRESET_TRUSTED_SIGNERS,
+    }
+
+
+@app.post("/api/settings/trusted-signers")
+def add_trusted_signer(body: TrustedSignerRequest):
+    name = body.signer.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Signer name cannot be empty")
+
+    for s in settings.trusted_signers:
+        if s.lower() == name.lower():
+            return {
+                "status": "exists",
+                "message": f"Signer '{name}' is already in trusted signers.",
+                "signers": settings.trusted_signers,
+                "presets": PRESET_TRUSTED_SIGNERS,
+            }
+
+    settings.trusted_signers.append(name)
+    save_trusted_signers(settings.trusted_signers)
+    broadcast_pipeline_event({
+        "type": "trusted_signers_updated",
+        "signers": settings.trusted_signers,
+    })
+    return {
+        "status": "success",
+        "message": f"Added '{name}' to trusted signers.",
+        "signers": settings.trusted_signers,
+        "presets": PRESET_TRUSTED_SIGNERS,
+    }
+
+
+@app.post("/api/settings/trusted-signers/delete")
+def delete_trusted_signer_post(body: TrustedSignerRequest):
+    return _remove_signer_internal(body.signer)
+
+
+@app.delete("/api/settings/trusted-signers/{signer:path}")
+def delete_trusted_signer_path(signer: str):
+    return _remove_signer_internal(signer)
 
 
 @app.post("/api/scans/clear")

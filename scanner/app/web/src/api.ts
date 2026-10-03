@@ -264,6 +264,33 @@ export async function clearScanHistory(): Promise<{ status: string }> {
   });
 }
 
+export interface TrustedSignersResponse {
+  signers: string[];
+  presets: string[];
+  status?: string;
+  message?: string;
+}
+
+export async function fetchTrustedSigners(): Promise<TrustedSignersResponse> {
+  return request<TrustedSignersResponse>("/api/settings/trusted-signers");
+}
+
+export async function addTrustedSigner(signer: string): Promise<TrustedSignersResponse> {
+  return request<TrustedSignersResponse>("/api/settings/trusted-signers", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ signer }),
+  });
+}
+
+export async function removeTrustedSigner(signer: string): Promise<TrustedSignersResponse> {
+  return request<TrustedSignersResponse>("/api/settings/trusted-signers/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ signer }),
+  });
+}
+
 export interface UnifiedReportFinding {
   severity: "critical" | "high" | "medium" | "low" | "info";
   checker: string;
