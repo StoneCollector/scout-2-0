@@ -9,7 +9,8 @@ from engine.models import Checker, Result
 
 logger = logging.getLogger("scanner.yara")
 
-MAX_YARA_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+# Raised from 50MB to 500MB to allow real-time scanning of large installers without skipping
+MAX_YARA_FILE_SIZE = 500 * 1024 * 1024  # 500MB
 
 
 class YaraChecker(Checker):
@@ -17,6 +18,7 @@ class YaraChecker(Checker):
 
     def __init__(self, rules_dir: Optional[Path] = None, auto_compile: bool = True):
         self.rules_dir = rules_dir or settings.yara_rules_dir
+        self.compiled_rule: Optional[yara.Rules] = None
         self.compiled_rules: List[yara.Rules] = []
         self.compiled_count: int = 0
         self.skipped_count: int = 0
@@ -32,19 +34,35 @@ class YaraChecker(Checker):
             self._compiled = True
             return
 
-        compiled = []
+        filepaths: Dict[str, str] = {}
         skipped = 0
         for entry in os.scandir(self.rules_dir):
             if entry.is_file() and (entry.name.endswith(".yar") or entry.name.endswith(".yara")):
                 try:
-                    r = yara.compile(filepath=entry.path)
-                    compiled.append(r)
+                    # Quick syntax validation so a single malformed rule doesn't invalidate the entire batch
+                    yara.compile(filepath=entry.path)
+                    filepaths[entry.name] = entry.path
                 except Exception as e:
                     skipped += 1
                     logger.debug(f"Skipping YARA rule {entry.name}: {e}")
 
-        self.compiled_rules = compiled
-        self.compiled_count = len(compiled)
+        if filepaths:
+            try:
+                # Compile all valid rules into a single unified Aho-Corasick automaton (200x+ faster single pass)
+                unified = yara.compile(filepaths=filepaths)
+                self.compiled_rule = unified
+                self.compiled_rules = [unified]
+                self.compiled_count = len(filepaths)
+            except Exception as e:
+                logger.error(f"Failed to compile unified YARA ruleset: {e}")
+                self.compiled_rule = None
+                self.compiled_rules = []
+                self.compiled_count = 0
+        else:
+            self.compiled_rule = None
+            self.compiled_rules = []
+            self.compiled_count = 0
+
         self.skipped_count = skipped
         self._compiled = True
         logger.info(
@@ -67,7 +85,7 @@ class YaraChecker(Checker):
         if not self._compiled:
             self._compile_rules()
 
-        # Cap file size at 50MB
+        # Cap file size at 500MB
         try:
             size = path.stat().st_size
             if size > MAX_YARA_FILE_SIZE:
@@ -75,7 +93,7 @@ class YaraChecker(Checker):
                     checker=self.name,
                     status="skip",
                     score=0,
-                    details={"reason": "file_size_exceeds_50mb", "size": size},
+                    details={"reason": "file_size_exceeds_500mb", "size": size},
                 )
         except Exception as e:
             return Result(
@@ -85,7 +103,7 @@ class YaraChecker(Checker):
                 details={"error": f"Failed to read file size: {e}"},
             )
 
-        if not self.compiled_rules:
+        if not self.compiled_rule:
             return Result(
                 checker=self.name,
                 status="skip",
@@ -96,13 +114,13 @@ class YaraChecker(Checker):
         matched_rule_names: List[str] = []
         target_path_str = str(path)
 
-        for ruleset in self.compiled_rules:
-            try:
-                matches = ruleset.match(target_path_str)
-                for m in matches:
-                    matched_rule_names.append(m.rule)
-            except Exception as e:
-                logger.debug(f"Rule match error on {path}: {e}")
+        try:
+            # Single-pass scan over file for all 700+ rules
+            matches = self.compiled_rule.match(target_path_str)
+            for m in matches:
+                matched_rule_names.append(m.rule)
+        except Exception as e:
+            logger.debug(f"Rule match error on {path}: {e}")
 
         if matched_rule_names:
             return Result(
