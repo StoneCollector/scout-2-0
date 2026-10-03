@@ -91,6 +91,23 @@ if (Test-Path $SrcClamAv) {
     } else {
         Write-Host "  - Warning: ClamAV cert not found at $SrcCert" -ForegroundColor Yellow
     }
+    # Clean any accidental cert bundles from certs/ (only clamav.crt must be in certs/)
+    Remove-Item "$DestCerts\curl-ca-bundle.crt" -Force -ErrorAction SilentlyContinue
+
+    # Ensure Mozilla Root CA bundle is packaged for libcurl HTTPS verification
+    $SrcCa = Join-Path $SrcClamAv "curl-ca-bundle.crt"
+    if (Test-Path $SrcCa) {
+        Copy-Item $SrcCa -Destination $DestClamAv -Force
+        Write-Host "  - Preserved Mozilla Root CA bundle (curl-ca-bundle.crt)" -ForegroundColor Gray
+    } else {
+        $CertifiPy = Join-Path $ScriptDir ".venv\Scripts\python.exe"
+        if (Test-Path $CertifiPy) {
+            & $CertifiPy -c "import certifi, shutil; shutil.copy(certifi.where(), r'$DestClamAv\curl-ca-bundle.crt')" 2>$null
+            if (Test-Path (Join-Path $DestClamAv "curl-ca-bundle.crt")) {
+                Write-Host "  - Generated Mozilla Root CA bundle from certifi" -ForegroundColor Gray
+            }
+        }
+    }
     Write-Host "  - Copied ClamAV runtime binaries (definitions excluded for lightweight packaging)" -ForegroundColor Gray
 } else {
     Write-Host "  - Warning: ClamAV directory not found at $SrcClamAv" -ForegroundColor Yellow

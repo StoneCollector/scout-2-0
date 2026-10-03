@@ -121,6 +121,36 @@ def ensure_clamav_configured() -> Optional[Path]:
             elif certs_dir.is_dir():
                 freshclam_cmd.append(f"--cvdcertsdir={certs_dir.resolve()}")
 
+            # Configure Mozilla Root CA certificate bundle for libcurl HTTPS verification
+            ca_bundle_candidates = [
+                clamav_dir / "curl-ca-bundle.crt",
+                settings.tools_dir / "clamav" / "curl-ca-bundle.crt",
+            ]
+            ca_bundle_file = None
+            for cand in ca_bundle_candidates:
+                if cand.is_file():
+                    ca_bundle_file = cand
+                    break
+
+            if not ca_bundle_file:
+                # Dynamically extract from certifi if available
+                try:
+                    import certifi
+                    certifi_path = Path(certifi.where())
+                    if certifi_path.is_file():
+                        target_ca = clamav_dir / "curl-ca-bundle.crt"
+                        import shutil
+                        shutil.copy2(certifi_path, target_ca)
+                        ca_bundle_file = target_ca
+                except Exception as ce:
+                    logger.debug(f"Could not extract certifi bundle: {ce}")
+
+            if ca_bundle_file and ca_bundle_file.is_file():
+                resolved_ca = str(ca_bundle_file.resolve())
+                freshclam_env["CURL_CA_BUNDLE"] = resolved_ca
+                freshclam_env["SSL_CERT_FILE"] = resolved_ca
+                logger.info(f"Configured libcurl Mozilla Root CA bundle: {resolved_ca}")
+
             creationflags = 0
             if os.name == "nt":
                 creationflags = subprocess.CREATE_NO_WINDOW
