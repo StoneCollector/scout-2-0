@@ -175,7 +175,9 @@ class PeStaticChecker(Checker):
         details = {
             "overall_entropy": overall_entropy,
             "max_section_entropy": max_section_entropy,
+            "entropy": overall_entropy,
             "sections": section_entropies,
+            "sections_count": len(section_entropies),
             "packer_detected": len(found_packer_sections) > 0,
             "packer_sections": found_packer_sections,
             "suspicious_apis": found_suspicious_apis,

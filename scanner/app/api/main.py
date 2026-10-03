@@ -608,13 +608,16 @@ def get_unified_report():
                 elif r.checker == "pe_static":
                     if r.status in ("warn", "fail"):
                         reasons = det.get("reasons", [])
+                        ent_val = det.get("overall_entropy", det.get("entropy", "N/A"))
+                        sec_list = det.get("sections", [])
+                        sec_count = len(sec_list) if isinstance(sec_list, list) and sec_list else det.get("sections_count", "N/A")
                         for rea in reasons:
                             sev = "high" if "entropy" in rea.lower() or "suspicious" in rea.lower() else "medium"
                             findings.append({
                                 "severity": sev,
                                 "checker": "Static PE",
                                 "title": f"Structural Anomaly: {rea}",
-                                "description": f"Entropy: {det.get('entropy', 'N/A')}, Sections: {det.get('sections_count', 'N/A')}",
+                                "description": f"Entropy: {ent_val}, Sections: {sec_count}",
                             })
 
                 elif r.checker == "malware_bazaar":
