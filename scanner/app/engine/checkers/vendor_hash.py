@@ -2,6 +2,7 @@ import fnmatch
 import hashlib
 import json
 import logging
+import os
 from pathlib import Path
 import re
 import time
@@ -56,10 +57,27 @@ class VendorHashChecker(Checker):
     @staticmethod
     def extract_version(filename: str) -> Optional[str]:
         """Extracts normalized semantic version from filename (e.g. 4.6.8, 7.2.20, 2.17.0)."""
-        m = re.search(r"(?:[-_vV]|^)(\d+(?:[._]\d+)+)", filename)
+        m = re.search(r"(?:[-_.]|[vV]|^)(\d+(?:[._]\d+)+)", filename)
         if m:
             return m.group(1).replace("_", ".")
         return None
+
+    @staticmethod
+    def extract_app_key(filename: str) -> str:
+        """Extracts base application name/identifier (e.g. putty, git, vlc, 7zip, notepadplusplus)."""
+        base = re.sub(r"\.[a-zA-Z0-9]+$", "", filename)
+        m = re.match(r"^([a-zA-Z]+|7z)", base)
+        if m:
+            key = m.group(1).lower()
+            aliases = {
+                "npp": "notepadplusplus",
+                "7z": "7zip",
+                "zap": "zaproxy",
+                "vbox": "virtualbox",
+                "code": "vscode",
+            }
+            return aliases.get(key, key)
+        return re.sub(r"[^a-zA-Z0-9]", "", base).lower()
 
     def check(self, path: Path, ctx: dict) -> Result:
         try:
@@ -116,50 +134,292 @@ class VendorHashChecker(Checker):
             else:
                 return Result(checker=self.name, status="fail", score=70, details=details)
 
-        # Tier 1: Match against configured VendorHashSource
+        # Tier 1: Match against configured VendorHashSource in config.yaml
         matched_source: Optional[VendorHashSource] = None
         for vh in settings.vendor_hashes:
             if fnmatch.fnmatch(filename, vh.pattern) or fnmatch.fnmatch(fn_lower, vh.pattern.lower()):
                 matched_source = vh
                 break
 
-        if not matched_source:
-            return Result(
-                checker=self.name,
-                status="skip",
-                score=0,
-                details={"reason": "no_registered_source"},
-            )
-
-        # Fetch and parse given digest from online feed (with dynamic version templating)
-        given_digest, source_url = self._get_given_digest(filename, matched_source)
-
-        if not given_digest:
-            return Result(
-                checker=self.name,
-                status="skip",
-                score=0,
-                details={
-                    "reason": "digest_not_found_in_feed",
-                    "source_url": source_url,
+        if matched_source:
+            given_digest, source_url = self._get_given_digest(filename, matched_source)
+            if given_digest:
+                given_digest = given_digest.strip().lower()
+                is_match = (calc_digest == given_digest)
+                details = {
+                    "given_digest": given_digest,
                     "calculated_digest": calc_digest,
-                },
-            )
+                    "match": is_match,
+                    "source_url": source_url,
+                }
+                if is_match:
+                    return Result(checker=self.name, status="pass", score=-30, details=details)
+                else:
+                    return Result(checker=self.name, status="fail", score=70, details=details)
 
-        given_digest = given_digest.strip().lower()
-        is_match = (calc_digest == given_digest)
+        # Tier 2-5: Universal Dynamic Discovery (Scoop Buckets, WinGet, GitHub Releases, Tavily)
+        dynamic_digest, detected_ver, dynamic_source = self.query_dynamic_sources(filename)
+        if dynamic_digest:
+            dynamic_digest = dynamic_digest.strip().lower()
+            is_match = (calc_digest == dynamic_digest)
+            details = {
+                "given_digest": dynamic_digest,
+                "calculated_digest": calc_digest,
+                "match": is_match,
+                "source": dynamic_source,
+                "source_url": dynamic_source,
+                "version": detected_ver,
+            }
+            if is_match:
+                return Result(checker=self.name, status="pass", score=-30, details=details)
+            else:
+                return Result(checker=self.name, status="fail", score=70, details=details)
 
-        details = {
-            "given_digest": given_digest,
-            "calculated_digest": calc_digest,
-            "match": is_match,
-            "source_url": source_url,
+        # If not indexed anywhere, safely skip without false-positive penalty
+        return Result(
+            checker=self.name,
+            status="skip",
+            score=0,
+            details={
+                "reason": "digest_not_found_in_feed",
+                "calculated_digest": calc_digest,
+            },
+        )
+
+    def query_dynamic_sources(self, filename: str) -> Tuple[Optional[str], Optional[str], str]:
+        """
+        Dynamically queries multi-tier public package repositories and search providers:
+        1. Scoop Community Buckets (Main, Extras, Versions on GitHub CDN)
+        2. Microsoft WinGet Repository (microsoft/winget-pkgs)
+        3. GitHub Releases API (for open-source tools)
+        4. Tavily AI Search (if TAVILY_API_KEY is configured in .env/settings)
+        """
+        # 1. Query Scoop
+        h, v, src = self.query_scoop(filename)
+        if h:
+            return h, v, src
+
+        # 2. Query WinGet
+        h, v, src = self.query_winget(filename)
+        if h:
+            return h, v, src
+
+        # 3. Query GitHub Releases
+        h, v, src = self.query_github_releases(filename)
+        if h:
+            return h, v, src
+
+        # 4. Query Tavily (if configured)
+        h, v, src = self.query_tavily(filename)
+        if h:
+            return h, v, src
+
+        return None, None, ""
+
+    def query_scoop(self, filename: str) -> Tuple[Optional[str], Optional[str], str]:
+        """Queries Scoop community package manifests (Main, Extras, Versions) on GitHub CDN."""
+        app_name = self.extract_app_key(filename)
+        if not app_name:
+            return None, None, ""
+
+        ver = self.extract_version(filename)
+        fn_lower = filename.lower()
+        is_64 = any(x in fn_lower for x in ("x64", "64-bit", "win64", "amd64", "x86_64"))
+
+        # Check local cache first
+        cache_file = settings.data_dir / "feeds" / f"scoop_{app_name}.json"
+        if cache_file.is_file() and (time.time() - cache_file.stat().st_mtime < 86400):
+            try:
+                data = json.loads(cache_file.read_text(encoding="utf-8"))
+                h, v = self._extract_scoop_hash(data, filename, is_64, ver)
+                if h:
+                    return h, v, f"scoop_manifest:{app_name}"
+            except Exception:
+                pass
+
+        buckets = ["Main", "Extras", "Versions"]
+        for b in buckets:
+            url = f"https://raw.githubusercontent.com/ScoopInstaller/{b}/master/bucket/{app_name}.json"
+            try:
+                resp = requests.get(url, headers={"User-Agent": "AegisSecurityScanner/1.0"}, timeout=6)
+                if resp.status_code == 200 and resp.text:
+                    data = resp.json()
+                    cache_file.parent.mkdir(parents=True, exist_ok=True)
+                    cache_file.write_text(resp.text, encoding="utf-8")
+                    h, v = self._extract_scoop_hash(data, filename, is_64, ver)
+                    if h:
+                        return h, v, f"scoop_manifest:{b}/{app_name}"
+            except Exception as e:
+                logger.debug(f"Scoop query {url} error: {e}")
+
+        return None, None, ""
+
+    @staticmethod
+    def _extract_scoop_hash(
+        data: dict, filename: str, is_64: bool, target_ver: Optional[str]
+    ) -> Tuple[Optional[str], Optional[str]]:
+        manifest_ver = str(data.get("version", ""))
+        arch = data.get("architecture", {})
+        arch_data = arch.get("64bit" if is_64 else "32bit", {}) or arch.get("32bit", {})
+
+        raw_hash = arch_data.get("hash") or data.get("hash")
+        download_url = arch_data.get("url") or data.get("url") or ""
+
+        if raw_hash and isinstance(raw_hash, str):
+            clean_h = raw_hash.strip().lower()
+            if clean_h.startswith("sha256:"):
+                clean_h = clean_h[7:].strip()
+            if len(clean_h) == 64 and re.fullmatch(r"[0-9a-fA-F]{64}", clean_h):
+                # Verify version match or filename match in download url
+                if (target_ver and manifest_ver and target_ver in manifest_ver) or (
+                    filename.lower() in str(download_url).lower()
+                ):
+                    return clean_h.lower(), manifest_ver
+                elif not target_ver:
+                    return clean_h.lower(), manifest_ver
+        return None, None
+
+    def query_winget(self, filename: str) -> Tuple[Optional[str], Optional[str], str]:
+        """Queries Microsoft WinGet package repository on GitHub."""
+        app_name = self.extract_app_key(filename)
+        ver = self.extract_version(filename)
+        if not app_name or not ver:
+            return None, None, ""
+
+        cache_file = settings.data_dir / "feeds" / f"winget_{app_name}_{ver}.txt"
+        if cache_file.is_file() and (time.time() - cache_file.stat().st_mtime < 86400):
+            try:
+                cached_h = cache_file.read_text(encoding="utf-8").strip()
+                if len(cached_h) == 64:
+                    return cached_h, ver, f"winget_manifest:{app_name}"
+            except Exception:
+                pass
+
+        first_char = app_name[0].lower()
+        common_publishers = {
+            "vlc": "VideoLAN/VLC",
+            "git": "Git/Git",
+            "putty": "SimonTatham/PuTTY",
+            "7zip": "7zip/7zip",
+            "notepadplusplus": "Notepad++/Notepad++",
+            "python": "Python/Python",
         }
+        pub_path = common_publishers.get(app_name, f"{app_name.capitalize()}/{app_name.capitalize()}")
+        url = f"https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/{first_char}/{pub_path}/{ver}/{pub_path.replace('/', '.')}.installer.yaml"
+        try:
+            resp = requests.get(url, headers={"User-Agent": "AegisSecurityScanner/1.0"}, timeout=6)
+            if resp.status_code == 200 and resp.text:
+                for line in resp.text.splitlines():
+                    if "InstallerSha256" in line:
+                        parts = line.split(":", 1)
+                        if len(parts) == 2:
+                            h = parts[1].strip()
+                            if len(h) == 64 and re.fullmatch(r"[0-9a-fA-F]{64}", h):
+                                cache_file.parent.mkdir(parents=True, exist_ok=True)
+                                cache_file.write_text(h.lower(), encoding="utf-8")
+                                return h.lower(), ver, f"winget_manifest:{pub_path}"
+        except Exception as e:
+            logger.debug(f"WinGet query error for {url}: {e}")
 
-        if is_match:
-            return Result(checker=self.name, status="pass", score=-30, details=details)
-        else:
-            return Result(checker=self.name, status="fail", score=70, details=details)
+        return None, None, ""
+
+    def query_github_releases(self, filename: str) -> Tuple[Optional[str], Optional[str], str]:
+        """Queries GitHub public releases API for open-source repositories."""
+        app_name = self.extract_app_key(filename)
+        ver = self.extract_version(filename)
+
+        known_repos = {
+            "git": "git-for-windows/git",
+            "notepadplusplus": "notepad-plus-plus/notepad-plus-plus",
+            "zap": "zaproxy/zaproxy",
+            "gh": "cli/cli",
+            "ripgrep": "BurntSushi/ripgrep",
+            "jq": "jqlang/jq",
+            "powertoys": "microsoft/PowerToys",
+        }
+        repo = known_repos.get(app_name)
+        if not repo:
+            return None, None, ""
+
+        url = f"https://api.github.com/repos/{repo}/releases/latest"
+        tag_url = f"https://api.github.com/repos/{repo}/releases/tags/v{ver}" if ver else url
+
+        for u in (tag_url, url):
+            try:
+                resp = requests.get(u, headers={"User-Agent": "AegisSecurityScanner/1.0"}, timeout=6)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    body = data.get("body", "")
+                    if filename.lower() in body.lower():
+                        h = self.parse_generic_html(body, filename)
+                        if h:
+                            return h, ver or data.get("tag_name"), f"github_releases:{repo}"
+                    for asset in data.get("assets", []):
+                        aname = asset.get("name", "").lower()
+                        if any(k in aname for k in ("sha256", "checksums", "sums.txt")):
+                            dl_url = asset.get("browser_download_url")
+                            if dl_url:
+                                a_resp = requests.get(
+                                    dl_url, headers={"User-Agent": "AegisSecurityScanner/1.0"}, timeout=6
+                                )
+                                if a_resp.status_code == 200:
+                                    h = self.parse_virtualbox_sums(
+                                        a_resp.text, filename
+                                    ) or self.parse_generic_html(a_resp.text, filename)
+                                    if h:
+                                        return h, ver or data.get("tag_name"), f"github_asset:{repo}/{aname}"
+            except Exception as e:
+                logger.debug(f"GitHub release query error: {e}")
+
+        return None, None, ""
+
+    def query_tavily(self, filename: str) -> Tuple[Optional[str], Optional[str], str]:
+        """Queries Tavily AI Search API if TAVILY_API_KEY is configured in settings or environment."""
+        key = getattr(settings, "tavily_key", "") or os.getenv("TAVILY_API_KEY", "")
+        if not key:
+            return None, None, ""
+
+        ver = self.extract_version(filename)
+        query = f'"{filename}" sha256 OR checksum'
+
+        url_hash = hashlib.sha256(query.encode("utf-8")).hexdigest()[:16]
+        cache_file = settings.data_dir / "feeds" / f"tavily_{url_hash}.json"
+        if cache_file.is_file() and (time.time() - cache_file.stat().st_mtime < 86400):
+            try:
+                cached_data = json.loads(cache_file.read_text(encoding="utf-8"))
+                for item in cached_data:
+                    snippet = item.get("content", "")
+                    h = self.parse_generic_html(snippet, filename)
+                    if h:
+                        return h, ver, item.get("url", "tavily_search")
+            except Exception:
+                pass
+
+        try:
+            resp = requests.post(
+                "https://api.tavily.com/search",
+                json={
+                    "api_key": key,
+                    "query": query,
+                    "search_depth": "advanced",
+                    "max_results": 5,
+                    "include_answer": False,
+                },
+                timeout=8,
+            )
+            if resp.status_code == 200:
+                results = resp.json().get("results", [])
+                cache_file.parent.mkdir(parents=True, exist_ok=True)
+                cache_file.write_text(json.dumps(results), encoding="utf-8")
+                for item in results:
+                    snippet = item.get("content", "")
+                    h = self.parse_generic_html(snippet, filename)
+                    if h:
+                        return h, ver, item.get("url", "tavily_search")
+        except Exception as e:
+            logger.debug(f"Tavily search error: {e}")
+
+        return None, None, ""
 
     def _get_given_digest(self, filename: str, source: VendorHashSource) -> Tuple[Optional[str], str]:
         if source.source_type == "manual":
@@ -311,7 +571,6 @@ class VendorHashChecker(Checker):
         except Exception:
             return None
 
-        # Search for elements containing hash
         for elem in root.iter():
             h_tag = elem.find("hash")
             if h_tag is not None and h_tag.text:
@@ -324,7 +583,6 @@ class VendorHashChecker(Checker):
                 url_lower = url_val.lower()
                 file_norm = re.sub(r"[^a-z0-9]", "", file_lower)
 
-                # Strict matching: exact normalized filename or URL tail
                 matches = (
                     fn_lower == file_lower
                     or fn_norm == file_norm
@@ -403,8 +661,6 @@ class VendorHashChecker(Checker):
             if labeled_global:
                 return labeled_global.group(1).lower()
 
-        # Strategy 4 (all_hashes[0] blind fallback) was intentionally removed
-        # because grabbing the first arbitrary hash in an unmatching feed causes false positive +70 blocks.
         return None
 
     @classmethod
@@ -412,7 +668,6 @@ class VendorHashChecker(Checker):
         """Auto-detects format if the configured source_type did not match or changed."""
         content_stripped = content.strip()
 
-        # Check for XML
         if content_stripped.startswith("<?xml") or (
             "<" in content_stripped and "</" in content_stripped and "xml" in content[:100].lower()
         ):
@@ -420,18 +675,15 @@ class VendorHashChecker(Checker):
             if res:
                 return res
 
-        # Check for BSD signatures (SHA256 (...) = ...)
         if "SHA256" in content and "=" in content:
             res = cls.parse_wireshark_sigs(content, filename)
             if res:
                 return res
 
-        # Check for GNU sha256sums
         res = cls.parse_virtualbox_sums(content, filename)
         if res:
             return res
 
-        # Check for HTML
         if (
             "<html" in content.lower()
             or "<body" in content.lower()

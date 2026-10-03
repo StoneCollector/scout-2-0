@@ -178,3 +178,36 @@ def test_zap_strict_matching_avoids_weekly():
     assert h == "ebdaf6f00ffd9c21891d29360196e13a14091f84dde2bfa1e0b61213a93bc5ca"
 
 
+def test_extract_app_key():
+    assert VendorHashChecker.extract_app_key("vlc-3.0.21-win64.exe") == "vlc"
+    assert VendorHashChecker.extract_app_key("Git-2.46.0-64-bit.exe") == "git"
+    assert VendorHashChecker.extract_app_key("putty-64bit-0.81-installer.msi") == "putty"
+    assert VendorHashChecker.extract_app_key("7z2408-x64.exe") == "7zip"
+    assert VendorHashChecker.extract_app_key("npp.8.6.9.Installer.x64.exe") == "notepadplusplus"
+
+
+def test_dynamic_sources_match(monkeypatch):
+    checker = VendorHashChecker()
+    mock_hash = "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+    # Mock dynamic query returning a valid hash
+    monkeypatch.setattr(checker, "query_dynamic_sources", lambda fn: (mock_hash, "1.0.0", "scoop_manifest:Main/testtool"))
+
+    res = checker.check(Path("C:/testtool-1.0.0.exe"), {"sha256": mock_hash})
+    assert res.status == "pass"
+    assert res.score == -30
+    assert res.details["source"] == "scoop_manifest:Main/testtool"
+    assert res.details["match"] is True
+
+
+def test_dynamic_sources_mismatch(monkeypatch):
+    checker = VendorHashChecker()
+    mock_hash = "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+    monkeypatch.setattr(checker, "query_dynamic_sources", lambda fn: (mock_hash, "1.0.0", "scoop_manifest:Main/testtool"))
+
+    res = checker.check(Path("C:/testtool-1.0.0.exe"), {"sha256": "0000000000000000000000000000000000000000000000000000000000000000"})
+    assert res.status == "fail"
+    assert res.score == 70
+    assert res.details["match"] is False
+
+
+
