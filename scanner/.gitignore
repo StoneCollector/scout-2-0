@@ -75,5 +75,7 @@ desktop.ini
 build/
 dist/
 Output/
-data/
+/data/
+
+
 

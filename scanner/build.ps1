@@ -115,6 +115,13 @@ foreach ($f in $Folders) {
     New-Item -ItemType Directory -Force -Path (Join-Path $DistDir $f) | Out-Null
 }
 
+# Copy known_hashes.json offline database
+$SrcKnownHashes = Join-Path $ScriptDir "app\data\known_hashes.json"
+if (Test-Path $SrcKnownHashes) {
+    Copy-Item $SrcKnownHashes -Destination (Join-Path $DistDir "data\known_hashes.json") -Force
+    Write-Host "  - Copied offline verified checksum database (known_hashes.json)" -ForegroundColor Gray
+}
+
 # Create config.yaml with relative paths
 $ConfigYamlContent = @"
 paths:
@@ -143,26 +150,35 @@ trusted_signers:
 vendor_hashes:
   - pattern: "*VirtualBox*"
     source_type: "virtualbox_sums"
-    url: "https://www.virtualbox.org/download/hashes/6.1.30/SHA256SUMS"
+    url: "https://download.virtualbox.org/virtualbox/{version}/SHA256SUMS"
+    fallback_urls:
+      - "https://www.virtualbox.org/download/hashes/{version}/SHA256SUMS"
+      - "https://www.virtualbox.org/download/hashes/7.0.20/SHA256SUMS"
+      - "https://www.virtualbox.org/download/hashes/6.1.30/SHA256SUMS"
     manual_sha256: null
 
   - pattern: "*ZAP*"
     source_type: "zap_xml"
-    url: "https://raw.githubusercontent.com/zaproxy/zap-admin/master/ZapVersions-2.11.xml"
+    url: "https://raw.githubusercontent.com/zaproxy/zap-admin/master/ZapVersions.xml"
+    fallback_urls:
+      - "https://raw.githubusercontent.com/zaproxy/zap-admin/master/ZapVersions-2.11.xml"
     manual_sha256: null
 
   - pattern: "*Wireshark*"
     source_type: "wireshark_sigs"
-    url: "https://www.wireshark.org/download/src/all-versions/SIGNATURES-3.6.0.txt"
+    url: "https://www.wireshark.org/download/src/all-versions/SIGNATURES-{version}.txt"
     fallback_urls:
-      - "https://www.wireshark.org/download/SIGNATURES-3.6.0.txt"
+      - "https://www.wireshark.org/download/SIGNATURES-{version}.txt"
+      - "https://www.wireshark.org/download/src/all-versions/SIGNATURES-4.6.8.txt"
+      - "https://www.wireshark.org/download/src/all-versions/SIGNATURES-3.6.0.txt"
     manual_sha256: null
 
   - pattern: "*LibreOffice*"
     source_type: "libreoffice_page"
-    url: "https://downloadarchive.documentfoundation.org/libreoffice/old/7.2.3.2/win/x86_64/LibreOffice_7.2.3.2_Win_x64.msi.mirrorlist"
+    url: "https://download.documentfoundation.org/libreoffice/stable/{version}/win/x86_64/LibreOffice_{version}_Win_x86-64.msi.mirrorlist"
     fallback_urls:
-      - "https://download.documentfoundation.org/libreoffice/stable/7.2.3/win/x86_64/LibreOffice_7.2.3_Win_x64.msi.mirrorlist"
+      - "https://downloadarchive.documentfoundation.org/libreoffice/old/{version}/win/x86_64/LibreOffice_{version}_Win_x86-64.msi.mirrorlist"
+      - "https://downloadarchive.documentfoundation.org/libreoffice/old/{version}/win/x86_64/LibreOffice_{version}_Win_x64.msi.mirrorlist"
     manual_sha256: null
 "@
 Set-Content -Path (Join-Path $DistDir "config.yaml") -Value $ConfigYamlContent -Encoding UTF8

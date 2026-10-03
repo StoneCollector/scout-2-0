@@ -1,0 +1,104 @@
+{
+  "description": "Scout Local Offline Verified Vendor Checksums Database",
+  "version": "1.0",
+  "entries": [
+    {
+      "product": "Oracle VirtualBox Extension Pack",
+      "version": "7.2.20",
+      "filename": "Oracle_VirtualBox_Extension_Pack-7.2.20.vbox-extpack",
+      "sha256": "0a050da993f2e3cf2e4e9cda2fa8667e44a2b25479b27abd41af6812c1e43591",
+      "vendor": "Oracle America, Inc."
+    },
+    {
+      "product": "Oracle VirtualBox Extension Pack",
+      "version": "7.0.20",
+      "filename": "Oracle_VM_VirtualBox_Extension_Pack-7.0.20.vbox-extpack",
+      "sha256": "0d5885fe77983634032d84784400e930bfdc92b3eb277d3372f8826bb2bf6fbf",
+      "vendor": "Oracle America, Inc."
+    },
+    {
+      "product": "Oracle VirtualBox",
+      "version": "7.0.20",
+      "filename": "VirtualBox-7.0.20-163906-Win.exe",
+      "sha256": "c8114c00d41872df8417c805273be8251e0cf9b33a598c25aaeb7cf3da4e3b7b",
+      "vendor": "Oracle America, Inc."
+    },
+    {
+      "product": "Oracle VirtualBox",
+      "version": "6.1.30",
+      "filename": "VirtualBox-6.1.30-148432-Win.exe",
+      "sha256": "8bad003d65e9f385c4bf1f413f1ea1242a4f16fd9f352848685c78732147c97b",
+      "vendor": "Oracle America, Inc."
+    },
+    {
+      "product": "Oracle VirtualBox Extension Pack",
+      "version": "6.1.30",
+      "filename": "Oracle_VM_VirtualBox_Extension_Pack-6.1.30.vbox-extpack",
+      "sha256": "a5ee3e693a0470a77735556a77a09aa83bfc48181998b9b21b1af82ef1d11c2a",
+      "vendor": "Oracle America, Inc."
+    },
+    {
+      "product": "Wireshark",
+      "version": "4.6.8",
+      "filename": "Wireshark-4.6.8-x64.exe",
+      "sha256": "8eba737cb6875d9b3709228d37893f71125bdc50d7148e24d9cdc755259e9c3a",
+      "vendor": "Wireshark Foundation"
+    },
+    {
+      "product": "Wireshark",
+      "version": "3.6.0",
+      "filename": "Wireshark-win64-3.6.0.exe",
+      "sha256": "8ffa9f2c7943d1e8ed8020d7d08c8015ec649c3e3af901808a9ec858564cd255",
+      "vendor": "Wireshark Foundation"
+    },
+    {
+      "product": "OWASP ZAP",
+      "version": "2.17.0",
+      "filename": "ZAP_2_17_0_windows.exe",
+      "sha256": "ebdaf6f00ffd9c21891d29360196e13a14091f84dde2bfa1e0b61213a93bc5ca",
+      "vendor": "OWASP / Checkmarx"
+    },
+    {
+      "product": "OWASP ZAP",
+      "version": "2.17.0",
+      "filename": "ZAP_2.17.0_Linux.tar.gz",
+      "sha256": "efe799aaa3627db683b43f00c9c210aea0b75c00cc8f0a0f0434d12bb3ddde5a",
+      "vendor": "OWASP / Checkmarx"
+    },
+    {
+      "product": "OWASP ZAP",
+      "version": "2.11.1",
+      "filename": "ZAP_2_11_1_windows.exe",
+      "sha256": "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff",
+      "vendor": "OWASP / Checkmarx"
+    },
+    {
+      "product": "LibreOffice",
+      "version": "26.8.0",
+      "filename": "LibreOffice_26.8.0_Win_x86-64.msi",
+      "sha256": "4aa6c6e1895f4055104effcb556bd3362d20c6ad707c149543304f395ef9db95",
+      "vendor": "The Document Foundation"
+    },
+    {
+      "product": "LibreOffice",
+      "version": "7.2.3",
+      "filename": "LibreOffice_7.2.3_Win_x64.msi",
+      "sha256": "8f6b3fa8bdf81f70b43689d45178b4790b0140d6962deac1b9381245d6568461",
+      "vendor": "The Document Foundation"
+    },
+    {
+      "product": "7-Zip",
+      "version": "24.08",
+      "filename": "7z2408-x64.exe",
+      "sha256": "9bfa50c822502ba06037a508fa5efbb8cfa82be06b99dddfd87834bc6ad7d605",
+      "vendor": "Igor Pavlov"
+    },
+    {
+      "product": "Notepad++",
+      "version": "8.6.9",
+      "filename": "npp.8.6.9.Installer.x64.exe",
+      "sha256": "e30cf2f97c4583d7aa0ba382d6eb53e7907f1ea58619bc9ba69ae929f6dd82db",
+      "vendor": "Don HO"
+    }
+  ]
+}

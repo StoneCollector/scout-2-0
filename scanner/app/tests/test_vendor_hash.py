@@ -122,3 +122,59 @@ def test_auto_detect_and_parse():
     h = VendorHashChecker.auto_detect_and_parse(sums_text, "MyTool-1.0.exe")
     assert h == "3333333333333333333333333333333333333333333333333333333333333333"
 
+
+def test_extract_version():
+    assert VendorHashChecker.extract_version("Wireshark-4.6.8-x64.exe") == "4.6.8"
+    assert VendorHashChecker.extract_version("Oracle_VirtualBox_Extension_Pack-7.2.20.vbox-extpack") == "7.2.20"
+    assert VendorHashChecker.extract_version("ZAP_2_17_0_windows.exe") == "2.17.0"
+    assert VendorHashChecker.extract_version("LibreOffice_26.8.0_Win_x86-64.msi") == "26.8.0"
+    assert VendorHashChecker.extract_version("no_version_tool.exe") is None
+
+
+def test_offline_database_match():
+    checker = VendorHashChecker()
+    # Wireshark 4.6.8 official release hash from known_hashes.json
+    res = checker.check(
+        Path("C:/Wireshark-4.6.8-x64.exe"),
+        {"sha256": "8eba737cb6875d9b3709228d37893f71125bdc50d7148e24d9cdc755259e9c3a"},
+    )
+    assert res.status == "pass"
+    assert res.score == -30
+    assert res.details["source"] == "offline_database"
+
+
+def test_unmatched_feed_safely_skips(monkeypatch):
+    checker = VendorHashChecker()
+    # Feed that has completely different file hashes, not mentioning our file
+    sample_sums = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa *OtherTool-9.9.exe\n"
+    monkeypatch.setattr(checker, "_fetch_feed_content", lambda source, fn: (sample_sums, "http://mock"))
+    
+    # Non-offline file name
+    res = checker.check(
+        Path("C:/Wireshark-99.99.99-custom.exe"),
+        {"sha256": "1234567890123456789012345678901234567890123456789012345678901234"},
+    )
+    # Must safely SKIP with score 0, NEVER penalize +70 / force block!
+    assert res.status == "skip"
+    assert res.score == 0
+    assert res.details.get("reason") == "digest_not_found_in_feed"
+
+
+def test_zap_strict_matching_avoids_weekly():
+    sample_xml = """<ZAP>
+      <core>
+        <daily>
+          <file>ZAP_WEEKLY_D-2021-10-18.zip</file>
+          <hash>SHA-256:0000000000000000000000000000000000000000000000000000000000000000</hash>
+        </daily>
+        <windows>
+          <file>ZAP_2_17_0_windows.exe</file>
+          <hash>SHA-256:ebdaf6f00ffd9c21891d29360196e13a14091f84dde2bfa1e0b61213a93bc5ca</hash>
+        </windows>
+      </core>
+    </ZAP>"""
+    # Release executable must match windows entry, NOT daily weekly entry
+    h = VendorHashChecker.parse_zap_xml(sample_xml, "ZAP_2_17_0_windows.exe")
+    assert h == "ebdaf6f00ffd9c21891d29360196e13a14091f84dde2bfa1e0b61213a93bc5ca"
+
+

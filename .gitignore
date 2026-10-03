@@ -91,5 +91,6 @@ desktop.ini
 **/build/
 **/dist/
 **/Output/
-**/data/
+/data/
+/scanner/data/
 
