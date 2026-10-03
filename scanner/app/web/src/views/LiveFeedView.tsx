@@ -219,7 +219,18 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({ activeCards, onClear
                           </span>
                           {icon}
                         </div>
-                        <div className="text-[10px] font-mono opacity-80">{statusLabel}</div>
+                        <div
+                          className="text-[10px] font-mono opacity-80 truncate"
+                          title={chk.id === "vendor_hash" && result?.details?.method ? `Method: ${result.details.method}\nSource: ${result.details.source_url || "N/A"}` : statusLabel}
+                        >
+                          {chk.id === "vendor_hash" && result?.details?.method
+                            ? (result.status === "pass"
+                                ? `Pass • ${result.details.method.split("(")[0].trim().replace("Verified ", "")}`
+                                : result.status === "skip"
+                                ? "Skip (Not Indexed)"
+                                : statusLabel)
+                            : statusLabel}
+                        </div>
                       </div>
                     );
                   })}

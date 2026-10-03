@@ -400,10 +400,23 @@ export const ScansView: React.FC = () => {
 
                             {res.checker === "vendor_hash" && (
                               <>
+                                <div className="text-slate-300">
+                                  <span className="text-slate-400 font-semibold">Method: </span>
+                                  <span className="font-semibold text-sky-400">
+                                    {res.details?.method || (res.details?.source ? String(res.details.source) : (res.status === "skip" ? "Multi-Tier Discovery (Not Indexed)" : "Vendor Feed"))}
+                                  </span>
+                                </div>
+                                <div>Match: {res.details?.match !== undefined ? (res.details.match ? "Yes (Verified Authentic)" : "No (Hash Mismatch)") : (res.status === "skip" ? "Skipped (Not Indexed)" : "N/A")}</div>
                                 <div>Given Hash: {res.details?.given_digest || "N/A"}</div>
                                 <div>Calculated: {res.details?.calculated_digest || "N/A"}</div>
-                                <div>Match: {res.details?.match ? "Yes" : "No"}</div>
-                                <div className="truncate">Feed URL: {res.details?.source_url || "N/A"}</div>
+                                {res.details?.source_url && (
+                                  <div className="truncate" title={res.details.source_url}>
+                                    Source: {res.details.source_url}
+                                  </div>
+                                )}
+                                {res.details?.product && (
+                                  <div>Product: {res.details.product} {res.details?.version ? `(v${res.details.version})` : ""}</div>
+                                )}
                               </>
                             )}
 

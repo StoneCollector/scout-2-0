@@ -32,11 +32,12 @@ def score_results(results: List[Result]) -> Tuple[int, Verdict, List[str]]:
                     reasons.append(f"Signed but untrusted publisher: {signer} (+25 score).")
 
         elif chk == "vendor_hash":
+            method_desc = det.get("method") or det.get("source_url") or "official release"
             if det.get("match") is True:
-                reasons.append(f"Vendor hash matched official release from {det.get('source_url', 'vendor')} (-30 score).")
+                reasons.append(f"Vendor hash verified via {method_desc} (-30 score).")
             elif det.get("match") is False:
                 force_block = True
-                reasons.append("Vendor hash mismatch against official release (+70 score).")
+                reasons.append(f"Vendor hash mismatch against {method_desc} (+70 score).")
 
         elif chk == "circl":
             if det.get("known") is True:

@@ -103,11 +103,12 @@ class VendorHashChecker(Checker):
         if calc_digest in self._offline_hashes:
             entry = self._offline_hashes[calc_digest]
             details = {
+                "method": "Offline Verified Database",
+                "source": "offline_database",
+                "source_url": "Offline Known Hashes Database (known_hashes.json)",
                 "given_digest": calc_digest,
                 "calculated_digest": calc_digest,
                 "match": True,
-                "source": "offline_database",
-                "source_url": "offline_database",
                 "product": entry.get("product"),
                 "version": entry.get("version"),
                 "vendor": entry.get("vendor"),
@@ -120,11 +121,12 @@ class VendorHashChecker(Checker):
             expected = entry["sha256"].strip().lower()
             is_match = (calc_digest == expected)
             details = {
+                "method": "Offline Verified Database",
+                "source": "offline_database",
+                "source_url": "Offline Known Hashes Database (known_hashes.json)",
                 "given_digest": expected,
                 "calculated_digest": calc_digest,
                 "match": is_match,
-                "source": "offline_database",
-                "source_url": "offline_database",
                 "product": entry.get("product"),
                 "version": entry.get("version"),
                 "vendor": entry.get("vendor"),
@@ -147,10 +149,12 @@ class VendorHashChecker(Checker):
                 given_digest = given_digest.strip().lower()
                 is_match = (calc_digest == given_digest)
                 details = {
+                    "method": f"Configured Vendor Feed ({matched_source.source_type})",
+                    "source": matched_source.source_type,
+                    "source_url": source_url,
                     "given_digest": given_digest,
                     "calculated_digest": calc_digest,
                     "match": is_match,
-                    "source_url": source_url,
                 }
                 if is_match:
                     return Result(checker=self.name, status="pass", score=-30, details=details)
@@ -163,11 +167,12 @@ class VendorHashChecker(Checker):
             dynamic_digest = dynamic_digest.strip().lower()
             is_match = (calc_digest == dynamic_digest)
             details = {
+                "method": self.format_method_label(dynamic_source),
+                "source": dynamic_source,
+                "source_url": dynamic_source,
                 "given_digest": dynamic_digest,
                 "calculated_digest": calc_digest,
                 "match": is_match,
-                "source": dynamic_source,
-                "source_url": dynamic_source,
                 "version": detected_ver,
             }
             if is_match:
@@ -181,10 +186,35 @@ class VendorHashChecker(Checker):
             status="skip",
             score=0,
             details={
+                "method": "Multi-Tier Discovery (Not Indexed)",
+                "source": "none",
+                "source_url": "Not indexed in known offline DB, vendor feeds, package managers, or search",
                 "reason": "digest_not_found_in_feed",
                 "calculated_digest": calc_digest,
             },
         )
+
+    @staticmethod
+    def format_method_label(source: str) -> str:
+        """Formats machine-readable source identifier into a human-readable method label."""
+        if not source:
+            return "Dynamic Discovery"
+        s = source.lower()
+        if "offline" in s:
+            return "Offline Verified Database"
+        if s.startswith("scoop"):
+            target = source.split(":", 1)[1] if ":" in source else source
+            return f"Scoop Package Manifest ({target})"
+        if s.startswith("winget"):
+            target = source.split(":", 1)[1] if ":" in source else source
+            return f"Microsoft WinGet Repository ({target})"
+        if s.startswith("github"):
+            target = source.split(":", 1)[1] if ":" in source else source
+            return f"GitHub Releases API ({target})"
+        if "searxng" in s:
+            target = source.split(":", 1)[1] if ":" in source else source
+            return f"Public SearXNG Instance ({target})"
+        return f"Vendor Feed ({source})"
 
     def query_dynamic_sources(self, filename: str) -> Tuple[Optional[str], Optional[str], str]:
         """
