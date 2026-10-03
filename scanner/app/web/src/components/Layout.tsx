@@ -145,8 +145,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, wsConnected }) => {
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-emerald-400 flex items-center justify-center shadow-md shadow-cyan-950/40 shrink-0">
                   <ShieldCheck className="w-4 h-4 text-white" />
                 </div>
-                <div className="font-bold text-base tracking-wide text-slate-100">
+                <div className="font-bold text-base tracking-wide text-slate-100 flex items-center gap-2">
                   Scout
+                  <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                    v1.0.3
+                  </span>
                 </div>
               </div>
               <button

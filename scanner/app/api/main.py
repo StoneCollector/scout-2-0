@@ -66,7 +66,7 @@ async def lifespan(app: FastAPI):
     logger.info("FastAPI engine services stopped.")
 
 
-app = FastAPI(title="Malware Scanner Demo API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Malware Scanner Demo API", version="1.0.3", lifespan=lifespan)
 
 # Security headers middleware
 @app.middleware("http")

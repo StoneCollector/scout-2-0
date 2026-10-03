@@ -9,7 +9,7 @@
 ; ==============================================================================
 
 #define MyAppName "Scout"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "Security Team"
 #define MyAppURL "http://localhost:8000"
 #define MyAppExeName "ScannerApp.exe"
