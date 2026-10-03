@@ -54,3 +54,7 @@ vendor_hashes:
       - "https://downloadarchive.documentfoundation.org/libreoffice/old/{version}/win/x86_64/LibreOffice_{version}_Win_x86-64.msi.mirrorlist"
       - "https://downloadarchive.documentfoundation.org/libreoffice/old/{version}/win/x86_64/LibreOffice_{version}_Win_x64.msi.mirrorlist"
     manual_sha256: null
+
+# Optional custom SearXNG instance URL (if empty, built-in public SearXNG instances are used as fallback)
+searxng_url: ""
+

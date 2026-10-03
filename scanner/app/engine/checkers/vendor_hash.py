@@ -157,7 +157,7 @@ class VendorHashChecker(Checker):
                 else:
                     return Result(checker=self.name, status="fail", score=70, details=details)
 
-        # Tier 2-5: Universal Dynamic Discovery (Scoop Buckets, WinGet, GitHub Releases, Tavily)
+        # Tier 2-5: Universal Dynamic Discovery (Scoop Buckets, WinGet, GitHub Releases, SearXNG)
         dynamic_digest, detected_ver, dynamic_source = self.query_dynamic_sources(filename)
         if dynamic_digest:
             dynamic_digest = dynamic_digest.strip().lower()
@@ -192,7 +192,7 @@ class VendorHashChecker(Checker):
         1. Scoop Community Buckets (Main, Extras, Versions on GitHub CDN)
         2. Microsoft WinGet Repository (microsoft/winget-pkgs)
         3. GitHub Releases API (for open-source tools)
-        4. Tavily AI Search (if TAVILY_API_KEY is configured in .env/settings)
+        4. Public SearXNG Instances (decentralized metasearch fallback)
         """
         # 1. Query Scoop
         h, v, src = self.query_scoop(filename)
@@ -209,8 +209,8 @@ class VendorHashChecker(Checker):
         if h:
             return h, v, src
 
-        # 4. Query Tavily (if configured)
-        h, v, src = self.query_tavily(filename)
+        # 4. Query SearXNG (Public instances + custom instance)
+        h, v, src = self.query_searxng(filename)
         if h:
             return h, v, src
 
@@ -373,51 +373,91 @@ class VendorHashChecker(Checker):
 
         return None, None, ""
 
-    def query_tavily(self, filename: str) -> Tuple[Optional[str], Optional[str], str]:
-        """Queries Tavily AI Search API if TAVILY_API_KEY is configured in settings or environment."""
-        key = getattr(settings, "tavily_key", "") or os.getenv("TAVILY_API_KEY", "")
-        if not key:
-            return None, None, ""
+    DEFAULT_SEARXNG_INSTANCES = [
+        "https://sx.xo.st",
+        "https://search.lumy.live",
+        "https://search.mectov.my.id",
+        "https://searx.be",
+        "https://baresearch.org",
+        "https://priv.au",
+    ]
 
+    def query_searxng(self, filename: str) -> Tuple[Optional[str], Optional[str], str]:
+        """
+        Queries public SearXNG instances (or custom configured SEARXNG_URL) for filename checksums.
+        Uses JSON search API with automatic fallback to generic HTML extraction across rotating instances.
+        """
         ver = self.extract_version(filename)
-        query = f'"{filename}" sha256 OR checksum'
+        query = f'"{filename}" sha256'
 
         url_hash = hashlib.sha256(query.encode("utf-8")).hexdigest()[:16]
-        cache_file = settings.data_dir / "feeds" / f"tavily_{url_hash}.json"
+        cache_file = settings.data_dir / "feeds" / f"searxng_{url_hash}.json"
         if cache_file.is_file() and (time.time() - cache_file.stat().st_mtime < 86400):
             try:
                 cached_data = json.loads(cache_file.read_text(encoding="utf-8"))
                 for item in cached_data:
-                    snippet = item.get("content", "")
+                    snippet = item.get("content", "") + " " + item.get("title", "")
                     h = self.parse_generic_html(snippet, filename)
                     if h:
-                        return h, ver, item.get("url", "tavily_search")
+                        return h, ver, item.get("url", "searxng_search")
             except Exception:
                 pass
 
-        try:
-            resp = requests.post(
-                "https://api.tavily.com/search",
-                json={
-                    "api_key": key,
-                    "query": query,
-                    "search_depth": "advanced",
-                    "max_results": 5,
-                    "include_answer": False,
-                },
-                timeout=8,
-            )
-            if resp.status_code == 200:
-                results = resp.json().get("results", [])
-                cache_file.parent.mkdir(parents=True, exist_ok=True)
-                cache_file.write_text(json.dumps(results), encoding="utf-8")
-                for item in results:
-                    snippet = item.get("content", "")
-                    h = self.parse_generic_html(snippet, filename)
+        instances = []
+        custom_url = getattr(settings, "searxng_url", "") or os.getenv("SEARXNG_URL", "")
+        if custom_url:
+            instances.append(custom_url.rstrip("/"))
+        for inst in self.DEFAULT_SEARXNG_INSTANCES:
+            if inst not in instances:
+                instances.append(inst)
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+
+        for inst in instances:
+            search_url = f"{inst}/search"
+            try:
+                # 1. Attempt JSON search
+                resp = requests.get(
+                    search_url,
+                    params={"q": query, "format": "json", "categories": "general"},
+                    headers=headers,
+                    timeout=5,
+                )
+                if resp.status_code == 200 and "json" in resp.headers.get("content-type", ""):
+                    results = resp.json().get("results", [])
+                    if results:
+                        cache_file.parent.mkdir(parents=True, exist_ok=True)
+                        cache_file.write_text(json.dumps(results), encoding="utf-8")
+                        for item in results:
+                            snippet = item.get("content", "") + " " + item.get("title", "")
+                            h = self.parse_generic_html(snippet, filename)
+                            if h:
+                                return h, ver, item.get("url", f"searxng:{inst}")
+
+                        # If hash not directly in snippets, check top 2 result page URLs for checksum files
+                        for item in results[:2]:
+                            page_url = item.get("url", "")
+                            if any(page_url.lower().endswith(ext) for ext in (".txt", ".sha256", ".asc", ".sums", ".mirrorlist")):
+                                try:
+                                    p_resp = requests.get(page_url, headers=headers, timeout=4)
+                                    if p_resp.status_code == 200:
+                                        h = self.auto_detect_and_parse(p_resp.text, filename) or self.parse_generic_html(p_resp.text, filename)
+                                        if h:
+                                            return h, ver, page_url
+                                except Exception:
+                                    pass
+                        return None, None, ""
+
+                # 2. Attempt HTML search fallback if JSON disabled on this instance
+                elif resp.status_code == 200 and "html" in resp.headers.get("content-type", ""):
+                    h = self.parse_generic_html(resp.text, filename)
                     if h:
-                        return h, ver, item.get("url", "tavily_search")
-        except Exception as e:
-            logger.debug(f"Tavily search error: {e}")
+                        return h, ver, f"searxng_html:{inst}"
+            except Exception as e:
+                logger.debug(f"SearXNG query to {inst} failed: {e}")
+                continue
 
         return None, None, ""
 

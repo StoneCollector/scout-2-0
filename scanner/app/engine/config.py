@@ -54,7 +54,7 @@ class Settings:
     # Keys
     abusech_key: str = ""
     nvd_key: str = ""
-    tavily_key: str = ""
+    searxng_url: str = ""
 
     # Signers & Hashes
     trusted_signers: List[str] = field(default_factory=list)
@@ -213,7 +213,7 @@ def load_settings(config_file: Optional[Path] = None) -> Settings:
         clamav_dir=clamav_p,
         abusech_key=os.getenv("ABUSECH_KEY", ""),
         nvd_key=os.getenv("NVD_KEY", ""),
-        tavily_key=os.getenv("TAVILY_API_KEY", "") or os.getenv("TAVILY_KEY", "") or raw_config.get("tavily_key", ""),
+        searxng_url=os.getenv("SEARXNG_URL", "") or raw_config.get("searxng_url", ""),
         trusted_signers=trusted,
         vendor_hashes=vendor_sources,
         clamav=clamav_settings,

@@ -210,4 +210,29 @@ def test_dynamic_sources_mismatch(monkeypatch):
     assert res.details["match"] is False
 
 
+def test_query_searxng_mock(monkeypatch):
+    checker = VendorHashChecker()
+    mock_hash = "8ffa9f2c7943d1e8ed8020d7d08c8015ec649c3e3af901808a9ec858564cd255"
 
+    class MockResponse:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+
+        def json(self):
+            return {
+                "results": [
+                    {
+                        "title": "Wireshark Releases",
+                        "content": f"Wireshark-4.4.0-x64.exe SHA256: {mock_hash}",
+                        "url": "https://www.wireshark.org/download",
+                    }
+                ]
+            }
+
+    import requests
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: MockResponse())
+
+    h, v, src = checker.query_searxng("Wireshark-4.4.0-x64.exe")
+    assert h == mock_hash
+    assert v == "4.4.0"
+    assert "wireshark.org" in src
