@@ -1,4 +1,6 @@
 import atexit
+import base64
+import ctypes
 import logging
 import os
 from pathlib import Path
@@ -10,6 +12,92 @@ from typing import Any, Dict, Optional
 from engine.config import settings
 
 logger = logging.getLogger("scanner.clamav")
+
+
+_ca_bundle_imported: bool = False
+
+
+def _import_ca_bundle_to_windows_store(ca_bundle_path: Path) -> None:
+    """Import PEM CA certificates from *ca_bundle_path* into the Windows user
+    Intermediate Certification Authorities store (HKCU\\..\\CA).
+
+    On stripped-down Windows installations the system Root store is empty, so
+    freshclam's libcurl—which feeds Windows store CAs (from ROOT and CA stores)
+    into its OpenSSL context via ossl_win_load_store()—cannot verify TLS connections.
+    Importing our Mozilla bundle into the CurrentUser 'CA' store makes all root CAs
+    available to libcurl/OpenSSL without triggering Windows security confirmation dialogs
+    (which writing to 'ROOT' does) and without requiring administrator privileges.
+    """
+    global _ca_bundle_imported
+    if os.name != "nt" or _ca_bundle_imported:
+        return
+    try:
+        crypt32 = ctypes.WinDLL("crypt32")
+
+        X509_ASN_ENCODING = 0x00000001
+        CERT_STORE_ADD_USE_EXISTING = 2
+
+        # Declare argtypes/restype so ctypes marshals correctly on 64-bit Windows.
+        HCERTSTORE = ctypes.c_void_p
+
+        crypt32.CertOpenSystemStoreW.restype = HCERTSTORE
+        crypt32.CertOpenSystemStoreW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p]
+
+        crypt32.CertAddEncodedCertificateToStore.restype = ctypes.c_bool
+        crypt32.CertAddEncodedCertificateToStore.argtypes = [
+            HCERTSTORE,          # hCertStore
+            ctypes.c_ulong,      # dwCertEncodingType
+            ctypes.c_char_p,     # pbCertEncoded  (pointer to DER bytes)
+            ctypes.c_ulong,      # cbCertEncoded  (byte count)
+            ctypes.c_ulong,      # dwAddDisposition
+            ctypes.c_void_p,     # ppCertContext  (out, optional)
+        ]
+
+        crypt32.CertCloseStore.restype = ctypes.c_bool
+        crypt32.CertCloseStore.argtypes = [HCERTSTORE, ctypes.c_ulong]
+
+        # Open the current-user CA store (no admin required, no prompt dialogs)
+        h_store = crypt32.CertOpenSystemStoreW(None, "CA")
+        if not h_store:
+            logger.debug("_import_ca_bundle: could not open Windows CA store")
+            return
+
+        pem_text = ca_bundle_path.read_text(encoding="utf-8", errors="replace")
+        added = 0
+        in_cert = False
+        b64_lines: list = []
+
+        for line in pem_text.splitlines():
+            if "-----BEGIN CERTIFICATE-----" in line:
+                in_cert = True
+                b64_lines = []
+            elif "-----END CERTIFICATE-----" in line and in_cert:
+                try:
+                    der = base64.b64decode("".join(b64_lines))
+                    ok = crypt32.CertAddEncodedCertificateToStore(
+                        h_store,
+                        X509_ASN_ENCODING,
+                        der,
+                        len(der),
+                        CERT_STORE_ADD_USE_EXISTING,
+                        None,
+                    )
+                    if ok:
+                        added += 1
+                except Exception:
+                    pass
+                in_cert = False
+            elif in_cert:
+                b64_lines.append(line.strip())
+
+        crypt32.CertCloseStore(h_store, 0)
+        _ca_bundle_imported = True
+        logger.info(
+            f"Imported/verified {added} Mozilla root CAs into Windows user CA store "
+            f"from {ca_bundle_path.name}"
+        )
+    except Exception as exc:
+        logger.debug(f"_import_ca_bundle_to_windows_store failed (non-fatal): {exc}")
 
 _process: Optional[subprocess.Popen] = None
 _status_lock = threading.Lock()
@@ -150,6 +238,11 @@ def ensure_clamav_configured() -> Optional[Path]:
                 freshclam_env["CURL_CA_BUNDLE"] = resolved_ca
                 freshclam_env["SSL_CERT_FILE"] = resolved_ca
                 logger.info(f"Configured libcurl Mozilla Root CA bundle: {resolved_ca}")
+                # Also import into Windows cert store so that freshclam's
+                # libcurl CURLOPT_SSL_CTX_FUNCTION hook (which seeds OpenSSL
+                # from the Windows store) has the right root CAs available on
+                # machines with a stripped-down or empty Windows cert store.
+                _import_ca_bundle_to_windows_store(ca_bundle_file)
 
             creationflags = 0
             if os.name == "nt":

@@ -9,7 +9,7 @@
 ; ==============================================================================
 
 #define MyAppName "Scout"
-#define MyAppVersion "1.0.3"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "Security Team"
 #define MyAppURL "http://localhost:8000"
 #define MyAppExeName "ScannerApp.exe"
@@ -30,7 +30,9 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64compatible
-PrivilegesRequired=lowest
+PrivilegesRequired=admin
+ChangesEnvironment=yes
+UsedUserAreasWarning=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -53,10 +55,23 @@ Name: "{app}\quarantine"; Permissions: users-full
 Name: "{app}\tools\clamav\database"; Permissions: users-full
 Name: "{app}\tools\clamav\certs"; Permissions: users-full
 
+[Registry]
+; Re-enable Windows automatic root cert updates if disabled by stripped OS
+Root: HKLM; Subkey: "SOFTWARE\Policies\Microsoft\SystemCertificates\AuthRoot"; ValueType: dword; ValueName: "DisableRootAutoUpdate"; ValueData: "0"; Flags: uninsdeletevalue
+
+; Set system-wide and user-wide OpenSSL / libcurl environment variables pointing to bundled CA bundle
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: string; ValueName: "CURL_CA_BUNDLE"; ValueData: "{app}\tools\clamav\curl-ca-bundle.crt"; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: string; ValueName: "SSL_CERT_FILE"; ValueData: "{app}\tools\clamav\curl-ca-bundle.crt"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Environment"; ValueType: string; ValueName: "CURL_CA_BUNDLE"; ValueData: "{app}\tools\clamav\curl-ca-bundle.crt"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Environment"; ValueType: string; ValueName: "SSL_CERT_FILE"; ValueData: "{app}\tools\clamav\curl-ca-bundle.crt"; Flags: uninsdeletevalue
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
+; Populate Windows Root Certificate stores with official Microsoft root catalog
+Filename: "certutil.exe"; Parameters: "-addstore -f Root ""{app}\tools\clamav\roots.sst"""; Flags: runhidden; StatusMsg: "Configuring system root security certificates..."
+Filename: "certutil.exe"; Parameters: "-addstore -f AuthRoot ""{app}\tools\clamav\roots.sst"""; Flags: runhidden; StatusMsg: "Configuring system root security certificates..."
+Filename: "certutil.exe"; Parameters: "-user -addstore -f CA ""{app}\tools\clamav\roots.sst"""; Flags: runhidden; StatusMsg: "Configuring user root security certificates..."
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

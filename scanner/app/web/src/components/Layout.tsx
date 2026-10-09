@@ -148,7 +148,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, wsConnected }) => {
                 <div className="font-bold text-base tracking-wide text-slate-100 flex items-center gap-2">
                   Scout
                   <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                    v1.0.3
+                    v1.1.0
                   </span>
                 </div>
               </div>

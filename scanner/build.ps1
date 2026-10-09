@@ -108,6 +108,12 @@ if (Test-Path $SrcClamAv) {
             }
         }
     }
+    # Ensure roots.sst catalog is packaged for offline Windows store populating
+    $SrcSst = Join-Path $SrcClamAv "roots.sst"
+    if (Test-Path $SrcSst) {
+        Copy-Item $SrcSst -Destination $DestClamAv -Force
+        Write-Host "  - Preserved Microsoft Root CA catalog (roots.sst)" -ForegroundColor Gray
+    }
     Write-Host "  - Copied ClamAV runtime binaries (definitions excluded for lightweight packaging)" -ForegroundColor Gray
 } else {
     Write-Host "  - Warning: ClamAV directory not found at $SrcClamAv" -ForegroundColor Yellow
